@@ -1,22 +1,34 @@
-import com.sun.net.httpserver.HttpServer;
-
-import javax.sound.sampled.Port;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Date;
 
 public class Server {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
-        try {
+        System.out.println("Serveren er startet og lytter på port 80");
 
-            System.out.println("Serveren er startet og lytter på port 80");
+        ServerSocket serverSocket = new ServerSocket(80); // Serverobjektet instansieres
 
-            ServerSocket serverSocket = new ServerSocket(80); // Serverobjektet instansieres
+        while (true) {
             Socket socket = serverSocket.accept();                  // Serveren åbner port 80 for forbindelser
+
+            new Thread(new HandleRequest(socket)).start();
+        }
+    }
+}
+
+class HandleRequest implements Runnable {
+    private final Socket socket;
+
+    public HandleRequest(Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void run() {
+        try {
 
             // Vi læser en stream med bogstaver fra browserens request in igennem socketen
             BufferedReader request = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -44,7 +56,23 @@ public class Server {
                     responsHeaders.println(); // Blank line between headers and content, very important !
                     responsHeaders.flush();
 
-                    responseStream.writeUTF("Hej med dig! Kelvin er sej!"); // Indholdet i responsen
+//                    responseStream.writeUTF("<h>Test</h>");
+//                    responseStream.writeUTF("<p>Hej med dig! Kelvin er sej!</p>"); // Indholdet i responsen
+//                    responseStream.writeUTF("<img src= https://camo.githubusercontent.com/db3d9393cf44727517d7d16725c389d89e9370e6/68747470733a2f2f692e696d67666c69702e636f6d2f346431386b762e6a7067>");
+
+                    StringBuilder contentBuilder = new StringBuilder();
+                    try {
+                        BufferedReader in = new BufferedReader(new FileReader(getClass().getResource("hjemmeside.html").getFile()));
+                        String str;
+                        while ((str = in.readLine()) != null) {
+                            contentBuilder.append(str);
+                        }
+                        in.close();
+                    } catch (IOException e) {
+                    }
+                    String content = contentBuilder.toString();
+                    responseStream.writeBytes(content);
+
                     responseStream.flush();
 
                     // Vi lukker begge streams
@@ -54,13 +82,11 @@ public class Server {
 
                 }
             }
-        }
-        catch (SocketException e) {
-            if ( e.getMessage().equals("Socket closed"))
-            System.out.println("Forbindelsen afsluttet efter en succesfuld response-request forløb.");
-        }
-        catch (IOException e) {
-            e.printStackTrace();
+        } catch (SocketException e) {
+            if (e.getMessage().equals("Socket closed"))
+                System.out.println("Forbindelsen afsluttet efter en succesfuld response-request forløb.");
+        } catch (IOException io) {
+            io.printStackTrace();
         }
     }
 }
